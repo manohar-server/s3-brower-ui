@@ -1,15 +1,23 @@
 package com.example.s3browser.controller;
 
-import jakarta.servlet.http.HttpSession;
+import javax.servlet.http.HttpSession;
+
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -22,9 +30,10 @@ public class S3Controller {
     }
 
     @PostMapping("/setCredentials")
-    public String setCredentials(@RequestParam String accessKey,
-                                 @RequestParam String secretKey,
-                                 HttpSession session) {
+    public String setCredentials(HttpSession session,
+                                 @RequestParam String accessKey,
+                                 @RequestParam String secretKey
+                                 ) {
         session.setAttribute("accessKey", accessKey);
         session.setAttribute("secretKey", secretKey);
         return "redirect:/buckets";
@@ -62,19 +71,43 @@ public class S3Controller {
 
     @GetMapping("/download/{bucketName}/{key}")
     @ResponseBody
-    public byte[] downloadObject(@PathVariable String bucketName,
-                                 @PathVariable String key,
-                                 HttpSession session) {
+    public ResponseEntity<byte[]> downloadObject(@PathVariable String bucketName,
+                                                 @PathVariable String key,
+                                                 HttpSession session) {
         S3Client s3 = getS3Client(session);
-        return s3.getObject(GetObjectRequest.builder()
-                .bucket(bucketName).key(key).build()).readAllBytes();
+
+        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                .bucket(bucketName)
+                .key(key)
+                .build();
+
+        try (ResponseInputStream<GetObjectResponse> s3Object = s3.getObject(getObjectRequest);
+             ByteArrayOutputStream buffer = new ByteArrayOutputStream()) {
+
+            byte[] data = new byte[8192];
+            int nRead;
+            while ((nRead = s3Object.read(data, 0, data.length)) != -1) {
+                buffer.write(data, 0, nRead);
+            }
+            buffer.flush();
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + key + "\"")
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .body(buffer.toByteArray());
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
     }
+
 
     private S3Client getS3Client(HttpSession session) {
         String accessKey = (String) session.getAttribute("accessKey");
         String secretKey = (String) session.getAttribute("secretKey");
         return S3Client.builder()
-                .region(Region.US_EAST_1)
+                .region(Region.AP_SOUTH_1)
                 .credentialsProvider(StaticCredentialsProvider.create(
                         AwsBasicCredentials.create(accessKey, secretKey)))
                 .build();
