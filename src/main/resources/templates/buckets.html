@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><title>Buckets</title></head>
+<body>
+<h1>Available Buckets</h1>
+<table border="1">
+    <tr><th>Bucket Name</th><th>Action</th></tr>
+    <tr th:each="bucket : ${buckets}">
+        <td th:text="${bucket}"></td>
+        <td><a th:href="@{'/buckets/' + ${bucket}}">View Objects</a></td>
+    </tr>
+</table>
+</body>
+</html>

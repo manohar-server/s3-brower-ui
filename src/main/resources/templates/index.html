@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><title>Login</title></head>
+<body>
+<h1>Enter AWS Credentials</h1>
+<form action="/setCredentials" method="post">
+    Access Key: <input type="text" name="accessKey" required><br>
+    Secret Key: <input type="password" name="secretKey" required><br>
+    <button type="submit">Submit</button>
+</form>
+</body>
+</html>
